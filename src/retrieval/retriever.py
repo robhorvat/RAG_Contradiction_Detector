@@ -7,38 +7,43 @@ from src.vector_store.chroma_manager import ChromaManager
 
 class AdvancedRetriever:
     """
-    Handles the two-stage retrieval process:
-    1. Initial candidate retrieval from ChromaDB.
-    2. Re-ranking of candidates using Cohere's Re-rank model.
+    Implements a two-stage retrieval process for enhanced accuracy.
+
+    Stage 1: Fast candidate retrieval from ChromaDB using vector similarity.
+    Stage 2: Sophisticated re-ranking of candidates using Cohere's Re-rank model
+             to find the most contextually relevant results.
     """
 
     def __init__(self, chroma_manager: ChromaManager, cohere_api_key: str):
         self.chroma_manager = chroma_manager
         self.collection = self.chroma_manager.create_or_get_collection("pubmed_papers")
         self.cohere_client = cohere.Client(cohere_api_key)
-        print("AdvancedRetriever initialized.")
 
     def retrieve(self, query: str, top_n_candidates: int = 10, top_n_reranked: int = 3) -> list[dict]:
         """
         Performs candidate retrieval and re-ranking.
-        """
-        print(f"Starting retrieval for query: '{query}'")
 
-        # 1. Candidate Retrieval from ChromaDB
+        Args:
+            query: The user's search query.
+            top_n_candidates: Number of documents to fetch from ChromaDB.
+            top_n_reranked: Final number of documents to return after re-ranking.
+
+        Returns:
+            A list of the top re-ranked documents with their relevance scores.
+        """
+        # Stage 1: Retrieve a broad set of candidate documents from the vector store.
         results = self.collection.query(
             query_texts=[query],
             n_results=top_n_candidates
         )
 
         candidate_docs = results['documents'][0]
-        candidate_metadatas = results['metadatas'][0]
-
         if not candidate_docs:
             return []
 
-        print(f"Retrieved {len(candidate_docs)} candidates from ChromaDB.")
+        candidate_metadatas = results['metadatas'][0]
 
-        # 2. Re-ranking with Cohere
+        # Stage 2: Use a more powerful model to re-rank the candidates for relevance.
         reranked_results = self.cohere_client.rerank(
             model='rerank-english-v3.0',
             query=query,
@@ -46,9 +51,7 @@ class AdvancedRetriever:
             top_n=top_n_reranked
         )
 
-        print(f"Re-ranked candidates. Top {top_n_reranked} results:")
-
-        # 3. Combine re-ranked results with their original metadata
+        # Combine the re-ranked results with their original text and metadata.
         final_results = []
         for hit in reranked_results.results:
             original_index = hit.index

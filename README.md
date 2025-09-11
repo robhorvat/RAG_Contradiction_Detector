@@ -6,8 +6,7 @@
 
 ## 🚀 Live Demo
 
-![Contradiction Detector Demo GIF](<INSERT_GIF_URL_HERE>) 
-*(You will create this GIF in the next step)*
+![Contradiction Detector Demo GIF](https://github.com/RomanceLIVE/RAG_Contradiction_Detector/raw/main/RAG_Demo.gif)
 
 ---
 
@@ -39,7 +38,7 @@ This project was built to be a production-grade prototype, showcasing advanced t
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/<YOUR_GITHUB_USERNAME>/contradiction-detector.git
+    git clone https://github.com/RomanceLIVE/RAG_Contradiction_Detector.git
     cd contradiction-detector
     ```
 2.  **Set up the environment:**

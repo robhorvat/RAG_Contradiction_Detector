@@ -8,34 +8,44 @@ load_dotenv()
 
 def get_paper_details(pubmed_id: str) -> dict:
     """
-    Fetches details of a paper from PubMed, handling journal articles, book chapters, and missing abstracts.
+    Fetches details for a given PubMed ID.
+
+    This function is designed to be resilient to PubMed's varied XML schemas by
+    checking for both standard journal articles (<PubmedArticle>) and book
+    chapters (<PubmedBookArticle>). It also gracefully handles entries that
+    may be missing an abstract.
+
+    Args:
+        pubmed_id: The unique identifier for a PubMed article.
+
+    Returns:
+        A dictionary containing paper details, or an error message if fetching fails.
     """
     base_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     params = {"db": "pubmed", "id": pubmed_id, "retmode": "xml", "rettype": "abstract"}
 
     try:
-        print(f"Fetching data for PubMed ID: {pubmed_id}...")
         response = requests.get(base_url, params=params)
         response.raise_for_status()
 
         root = ET.fromstring(response.content)
 
+        # Accommodate different publication types in the PubMed XML schema.
         article = root.find(".//PubmedArticle")
         if article is None:
             article = root.find(".//PubmedBookArticle")
 
         if article is None:
-            # This happens for IDs that return an empty PubmedArticleSet
             return {"error": f"No valid PubmedArticle or PubmedBookArticle found for ID {pubmed_id}."}
 
         title_element = article.find(".//ArticleTitle")
-        title = title_element.text if title_element is not None else "No title found"
+        title = title_element.text if title_element is not None else "No Title Found"
 
+        # Abstracts can be split into multiple tags, so we join them.
+        # If no abstract tag exists, return an empty string.
         abstract_elements = article.findall(".//AbstractText")
-        if abstract_elements:
-            abstract = "\n".join([elem.text.strip() for elem in abstract_elements if elem.text is not None])
-        else:
-            abstract = ""  # Return an empty string if no abstract is found
+        abstract = "\n".join(
+            [elem.text.strip() for elem in abstract_elements if elem.text]) if abstract_elements else ""
 
         author_list = article.findall(".//Author")
         authors = [
@@ -58,8 +68,11 @@ def get_paper_details(pubmed_id: str) -> dict:
         return {"error": f"Failed to parse XML response: {e}"}
 
 
-# A clean, simple example for future reference.
+# This block is for direct script testing and demonstration.
 if __name__ == '__main__':
-    test_id = "29276945"  # A known good ID (the coffee paper)
+    # Example usage with a known good ID.
+    test_id = "29276945"
     details = get_paper_details(test_id)
+
+    # Using json.dumps for pretty-printing the output dictionary.
     print(json.dumps(details, indent=2))
