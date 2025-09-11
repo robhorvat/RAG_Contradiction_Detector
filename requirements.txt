@@ -1,0 +1,11 @@
+requests
+python-dotenv
+pandas
+langchain
+langchain-openai
+langchain-experimental
+tiktoken
+numpy
+chromadb
+openai
+cohere
