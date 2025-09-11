@@ -8,7 +8,7 @@ from src.vector_store.chroma_manager import ChromaManager
 from src.data_ingestion.pubmed_fetcher import get_paper_details
 from src.processing.text_splitter import chunk_text_semantically
 
-# Page Configuration 
+# Page Configuration
 st.set_page_config(page_title="Biomedical Contradiction Detector", page_icon="🔎", layout="wide")
 
 
