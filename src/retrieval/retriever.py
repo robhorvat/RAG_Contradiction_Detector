@@ -20,10 +20,16 @@ class AdvancedRetriever:
     intensive re-ranking model to find the true best matches.
     """
 
-    def __init__(self, chroma_manager: ChromaManager, cohere_api_key: str):
+    def __init__(
+        self,
+        chroma_manager: ChromaManager,
+        cohere_api_key: str | None,
+        cohere_model: str = "rerank-english-v3.0",
+    ):
         self.chroma_manager = chroma_manager
         self.collection = self.chroma_manager.create_or_get_collection("pubmed_papers")
-        self.cohere_client = cohere.Client(cohere_api_key)
+        self.cohere_client = cohere.Client(cohere_api_key) if cohere_api_key else None
+        self.cohere_model = cohere_model
 
     def retrieve(self, query: str, paper_id: str, top_n_candidates: int = 10, top_n_reranked: int = 3) -> list[dict]:
         """
@@ -55,13 +61,23 @@ class AdvancedRetriever:
 
         candidate_metadatas = results['metadatas'][0]
 
+        if self.cohere_client is None:
+            return [
+                {
+                    "text": candidate_docs[i],
+                    "metadata": candidate_metadatas[i],
+                    "relevance_score": None,
+                }
+                for i in range(min(int(top_n_reranked), len(candidate_docs)))
+            ]
+
         # Stage 2: Use Cohere's powerful re-ranker to find the best matches.
         # This step is slower but much more accurate than vector similarity alone.
         reranked_results = self.cohere_client.rerank(
-            model='rerank-english-v3.0',
+            model=self.cohere_model,
             query=query,
             documents=candidate_docs,
-            top_n=top_n_reranked
+            top_n=int(top_n_reranked)
         )
 
         # Finally, we combine the re-ranked results with their original metadata
