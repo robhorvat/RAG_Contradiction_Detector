@@ -1,6 +1,5 @@
 import os
 import json
-from openai import OpenAI
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
@@ -12,7 +11,9 @@ if __name__ == '__main__':
 
 # We now import our Pydantic schema to enforce the structure of the LLM's output.
 from src.agent.schemas import LLMResponse
+from src.agent.llm_clients import OpenAIJSONClient
 from src.retrieval.retriever import AdvancedRetriever
+from src.verifier.heuristic_verifier import HeuristicContradictionVerifier
 from src.vector_store.chroma_manager import ChromaManager
 from src.data_ingestion.pubmed_fetcher import get_paper_details
 from src.processing.text_splitter import chunk_text_semantically
@@ -30,9 +31,10 @@ class ContradictionChecker:
     The core RAG agent that orchestrates the retrieval and analysis of scientific papers.
     """
 
-    def __init__(self, retriever: AdvancedRetriever, openai_api_key: str):
+    def __init__(self, retriever: AdvancedRetriever, llm_client):
         self.retriever = retriever
-        self.openai_client = OpenAI(api_key=openai_api_key)
+        self.llm_client = llm_client
+        self.heuristic_verifier = HeuristicContradictionVerifier()
         self.system_prompt = self._get_system_prompt()
 
     def _get_system_prompt(self):
@@ -73,30 +75,31 @@ class ContradictionChecker:
             f"**Retrieved Passages from Paper 2 (ID: {paper_2_id}):**\n{formatted_context_2}"
         )
 
-        response = self.openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "system", "content": self.system_prompt}, {"role": "user", "content": user_message}],
-            temperature=0,
-            response_format={"type": "json_object"}
-        )
-
         try:
-            llm_output = json.loads(response.choices[0].message.content)
+            llm_output, raw_response = self.llm_client.generate_json(
+                system_prompt=self.system_prompt,
+                user_message=user_message,
+            )
             # This is the crucial validation step. It will raise a ValidationError
             # if the JSON from the LLM is malformed or missing fields.
             validated_data = LLMResponse.model_validate(llm_output)
 
             # Convert the validated Pydantic model back to a dict for the rest of the app.
             analysis_result = validated_data.model_dump()
+            baseline = self.heuristic_verifier.predict(
+                analysis_result["paper_1_claim"],
+                analysis_result["paper_2_claim"],
+            )
 
             analysis_result['evidence_paper_1'] = [chunk['text'] for chunk in context_1_chunks]
             analysis_result['evidence_paper_2'] = [chunk['text'] for chunk in context_2_chunks]
+            analysis_result['baseline_verifier'] = baseline
             return analysis_result
-        except (json.JSONDecodeError, ValidationError) as e:
+        except (json.JSONDecodeError, ValidationError, ValueError) as e:
             # We now catch both JSON parsing errors and Pydantic validation errors.
             return {
                 "error": f"LLM output failed validation: {e}",
-                "raw_response": response.choices[0].message.content
+                "raw_response": raw_response if "raw_response" in locals() else None,
             }
 
 
@@ -131,7 +134,8 @@ if __name__ == '__main__':
 
     print("\n--- Running full RAG contradiction check ---")
     retriever = AdvancedRetriever(chroma_manager=chroma_manager, cohere_api_key=cohere_key)
-    checker = ContradictionChecker(retriever=retriever, openai_api_key=openai_key)
+    llm = OpenAIJSONClient(api_key=openai_key, model="gpt-4o")
+    checker = ContradictionChecker(retriever=retriever, llm_client=llm)
 
     analysis_result = checker.check(
         paper_1_id=paper1_id,

@@ -1,8 +1,9 @@
 import streamlit as st
-import os
 from dotenv import load_dotenv
 
 from src.agent.contradiction_checker import ContradictionChecker
+from src.agent.llm_clients import OpenAIJSONClient, GeminiJSONClient, LocalRuleBasedJSONClient
+from src.config import load_settings
 from src.retrieval.retriever import AdvancedRetriever
 from src.vector_store.chroma_manager import ChromaManager
 from src.data_ingestion.pubmed_fetcher import get_paper_details
@@ -12,6 +13,30 @@ from src.processing.text_splitter import chunk_text_semantically
 st.set_page_config(page_title="Biomedical Contradiction Detector", page_icon="🔎", layout="wide")
 
 
+def _build_llm_client(settings):
+    provider = settings.llm_provider
+    if provider == "openai":
+        if not settings.openai_api_key:
+            raise RuntimeError("LLM_PROVIDER=openai requires OPENAI_API_KEY.")
+        return OpenAIJSONClient(
+            api_key=settings.openai_api_key,
+            model=settings.openai_chat_model,
+        )
+
+    if provider == "gemini":
+        if not settings.gemini_api_key:
+            raise RuntimeError("LLM_PROVIDER=gemini requires GEMINI_API_KEY.")
+        return GeminiJSONClient(
+            api_key=settings.gemini_api_key,
+            model=settings.gemini_model,
+        )
+
+    if provider == "local":
+        return LocalRuleBasedJSONClient()
+
+    raise RuntimeError(f"Unsupported LLM_PROVIDER: {provider}")
+
+
 @st.cache_resource
 def initialize_system():
     """
@@ -19,15 +44,20 @@ def initialize_system():
     This function is cached, so it only runs once per session, making the app fast.
     """
     load_dotenv()
-    openai_key = os.getenv("OPENAI_API_KEY")
-    cohere_key = os.getenv("COHERE_API_KEY")
-    if not (openai_key and cohere_key): return None
+    settings = load_settings()
+    if not settings.openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is required for embeddings/chunking.")
 
-    chroma_manager = ChromaManager(openai_api_key=openai_key)
-    retriever = AdvancedRetriever(chroma_manager=chroma_manager, cohere_api_key=cohere_key)
-    checker = ContradictionChecker(retriever=retriever, openai_api_key=openai_key)
+    chroma_manager = ChromaManager(openai_api_key=settings.openai_api_key)
+    retriever = AdvancedRetriever(
+        chroma_manager=chroma_manager,
+        cohere_api_key=settings.cohere_api_key,
+        cohere_model=settings.cohere_rerank_model,
+    )
+    llm_client = _build_llm_client(settings)
+    checker = ContradictionChecker(retriever=retriever, llm_client=llm_client)
 
-    return checker, chroma_manager, openai_key
+    return checker, chroma_manager, settings.openai_api_key, settings
 
 
 def ensure_papers_are_in_db(paper_ids: list[str], chroma_manager: ChromaManager, openai_key: str):
@@ -53,15 +83,17 @@ def ensure_papers_are_in_db(paper_ids: list[str], chroma_manager: ChromaManager,
 
 
 # --- Main App Execution ---
-components = initialize_system()
-if not components:
-    st.error("API keys missing. Please configure your .env file.")
+try:
+    components = initialize_system()
+except RuntimeError as exc:
+    st.error(str(exc))
     st.stop()
 
-checker_agent, chroma_manager, openai_key = components
+checker_agent, chroma_manager, openai_key, settings = components
 
 st.title("🔎 Biomedical Contradiction Detector")
 st.markdown("This app uses a RAG pipeline to analyze scientific papers. Enter any two PubMed IDs to begin.")
+st.caption(f"LLM provider: `{settings.llm_provider}`")
 
 if 'analysis_result' not in st.session_state: st.session_state.analysis_result = None
 
@@ -107,6 +139,14 @@ if st.session_state.analysis_result:
         color = "red" if verdict == "Contradictory" else "orange" if verdict == "Unrelated" else "green"
         st.markdown(f"### Verdict: <span style='color:{color};'>{verdict}</span>", unsafe_allow_html=True)
         st.info(f"**Justification:** {result.get('analysis', {}).get('justification', 'N/A')}")
+        baseline = result.get("baseline_verifier")
+        if baseline:
+            st.caption(
+                "Heuristic baseline: "
+                f"{baseline.get('verdict', 'Unknown')} "
+                f"(confidence={baseline.get('confidence', 'n/a')}, "
+                f"overlap={baseline.get('overlap_ratio', 'n/a')})"
+            )
         col1, col2 = st.columns(2)
         with col1, st.container(border=True):
             st.subheader(f"Claim from Paper 1 ({pids[0]})")
