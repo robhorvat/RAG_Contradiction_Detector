@@ -10,6 +10,7 @@ from src.retrieval.retriever import AdvancedRetriever
 from src.vector_store.chroma_manager import ChromaManager
 from src.data_ingestion.pubmed_fetcher import get_paper_details
 from src.processing.text_splitter import chunk_text_semantically
+from src.observability.metrics import start_metrics_server
 
 # Page Configuration
 st.set_page_config(page_title="Biomedical Contradiction Detector", page_icon="🔎", layout="wide")
@@ -86,6 +87,19 @@ def initialize_system():
     runtime_notes = []
     torch_verifier = None
 
+    if settings.metrics_enabled:
+        ok, msg = start_metrics_server(host=settings.metrics_host, port=settings.metrics_port)
+        if ok:
+            runtime_notes.append(
+                "Prometheus metrics enabled at "
+                f"`http://localhost:{settings.metrics_port}/metrics` "
+                f"({msg})"
+            )
+        else:
+            runtime_notes.append(f"Prometheus metrics disabled: {msg}")
+    else:
+        runtime_notes.append("Prometheus metrics disabled via METRICS_ENABLED.")
+
     if settings.verifier_backend == "torch":
         ckpt_path, source_or_error = _resolve_torch_checkpoint(settings)
         if ckpt_path is None:
@@ -108,6 +122,8 @@ def initialize_system():
         torch_verifier=torch_verifier,
         verifier_strategy=settings.verifier_strategy,
         verifier_override_confidence=settings.verifier_override_confidence,
+        llm_provider=settings.llm_provider,
+        metrics_enabled=settings.metrics_enabled,
     )
 
     return checker, chroma_manager, settings.openai_api_key, settings, runtime_notes

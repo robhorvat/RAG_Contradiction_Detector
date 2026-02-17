@@ -12,3 +12,4 @@ tenacity==9.0.0
 typing-extensions
 pytest
 torch
+prometheus-client==0.21.1

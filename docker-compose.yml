@@ -10,8 +10,11 @@ services:
       - .env
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      METRICS_ENABLED: ${METRICS_ENABLED:-1}
+      METRICS_PORT: ${METRICS_PORT:-9108}
     ports:
       - "8501:8501"
+      - "9108:9108"
     volumes:
       - ./db:/app/db
       - ./reports:/app/reports
@@ -29,11 +32,14 @@ services:
       - .env
     environment:
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      METRICS_ENABLED: ${METRICS_ENABLED:-1}
+      METRICS_PORT: ${METRICS_PORT:-9108}
     gpus: all
     profiles:
       - gpu
     ports:
       - "8502:8501"
+      - "9109:9108"
     volumes:
       - ./db:/app/db
       - ./reports:/app/reports

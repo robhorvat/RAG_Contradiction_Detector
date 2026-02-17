@@ -71,6 +71,9 @@ I designed this project to be a robust prototype, focusing on engineering decisi
       VERIFIER_OVERRIDE_CONFIDENCE="0.65"
       TORCH_VERIFIER_CHECKPOINT="" # optional explicit .pt path
       MODEL_REGISTRY_LATEST_PATH="artifacts/model_registry_latest.json"
+      METRICS_ENABLED="1"
+      METRICS_HOST="0.0.0.0"
+      METRICS_PORT="9108"
       ```
     *   If you choose Gemini provider, install support once:
       ```bash
@@ -206,6 +209,20 @@ Generated files:
   - verdict source (`llm` or `torch_verifier`)
   - arbitration reason
 
+### Observability (Prometheus-Compatible)
+- The app exports runtime metrics on a dedicated endpoint:
+  - `http://localhost:9108/metrics` (when `METRICS_ENABLED=1`)
+- Instrumented metrics include:
+  - `rag_pipeline_requests_total` by provider/verdict/source
+  - `rag_pipeline_errors_total` by provider/error type
+  - `rag_pipeline_duration_seconds`
+  - retrieved chunk count distribution
+  - verifier disagreement/override counters
+- Quick local check:
+  ```bash
+  curl -s http://localhost:9108/metrics | head -n 40
+  ```
+
 ## Docker Workflow (Recommended)
 
 Using Docker avoids local Python/package drift and makes onboarding much faster.
@@ -216,6 +233,7 @@ make docker-build-cpu
 make docker-up-cpu
 ```
 Open: `http://localhost:8501`
+Metrics: `http://localhost:9108/metrics`
 
 ### GPU (optional, faster torch workloads)
 Prerequisites:
@@ -229,6 +247,7 @@ make docker-build-gpu
 make docker-up-gpu
 ```
 Open: `http://localhost:8502`
+Metrics: `http://localhost:9109/metrics`
 
 ### Auto mode (GPU if available, otherwise CPU)
 ```bash

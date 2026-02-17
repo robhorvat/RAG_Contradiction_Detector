@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
@@ -15,6 +16,7 @@ from src.agent.llm_clients import OpenAIJSONClient
 from src.retrieval.retriever import AdvancedRetriever
 from src.verifier.heuristic_verifier import HeuristicContradictionVerifier
 from src.verifier.verdict_arbitration import arbitrate_verdict
+from src.observability.metrics import record_pipeline_error, record_pipeline_success
 from src.vector_store.chroma_manager import ChromaManager
 from src.data_ingestion.pubmed_fetcher import get_paper_details
 from src.processing.text_splitter import chunk_text_semantically
@@ -40,6 +42,8 @@ class ContradictionChecker:
         torch_verifier=None,
         verifier_strategy: str = "llm_only",
         verifier_override_confidence: float = 0.65,
+        llm_provider: str = "unknown",
+        metrics_enabled: bool = True,
     ):
         self.retriever = retriever
         self.llm_client = llm_client
@@ -47,6 +51,8 @@ class ContradictionChecker:
         self.torch_verifier = torch_verifier
         self.verifier_strategy = verifier_strategy
         self.verifier_override_confidence = float(verifier_override_confidence)
+        self.llm_provider = str(llm_provider or "unknown")
+        self.metrics_enabled = bool(metrics_enabled)
         self.system_prompt = self._get_system_prompt()
 
     def _get_system_prompt(self):
@@ -75,19 +81,22 @@ class ContradictionChecker:
 
     def check(self, paper_1_id: str, paper_2_id: str, topic: str) -> dict:
         """Performs the full RAG-based contradiction check with schema validation."""
-        context_1_chunks = self.retriever.retrieve(query=topic, paper_id=paper_1_id)
-        context_2_chunks = self.retriever.retrieve(query=topic, paper_id=paper_2_id)
-
-        formatted_context_1 = _format_context_for_prompt(context_1_chunks)
-        formatted_context_2 = _format_context_for_prompt(context_2_chunks)
-
-        user_message = (
-            f"**Topic of Interest:** {topic}\n\n"
-            f"**Retrieved Passages from Paper 1 (ID: {paper_1_id}):**\n{formatted_context_1}\n\n"
-            f"**Retrieved Passages from Paper 2 (ID: {paper_2_id}):**\n{formatted_context_2}"
-        )
-
+        started = time.perf_counter()
+        context_1_chunks = []
+        context_2_chunks = []
         try:
+            context_1_chunks = self.retriever.retrieve(query=topic, paper_id=paper_1_id)
+            context_2_chunks = self.retriever.retrieve(query=topic, paper_id=paper_2_id)
+
+            formatted_context_1 = _format_context_for_prompt(context_1_chunks)
+            formatted_context_2 = _format_context_for_prompt(context_2_chunks)
+
+            user_message = (
+                f"**Topic of Interest:** {topic}\n\n"
+                f"**Retrieved Passages from Paper 1 (ID: {paper_1_id}):**\n{formatted_context_1}\n\n"
+                f"**Retrieved Passages from Paper 2 (ID: {paper_2_id}):**\n{formatted_context_2}"
+            )
+
             llm_output, raw_response = self.llm_client.generate_json(
                 system_prompt=self.system_prompt,
                 user_message=user_message,
@@ -125,11 +134,41 @@ class ContradictionChecker:
             analysis_result['baseline_verifier'] = baseline
             analysis_result['torch_verifier'] = torch_prediction
             analysis_result['verifier_arbitration'] = arbitration
+            duration = time.perf_counter() - started
+            record_pipeline_success(
+                llm_provider=self.llm_provider,
+                final_verdict=final_verdict,
+                verdict_source=analysis_result["analysis"].get("verdict_source", "llm"),
+                duration_seconds=duration,
+                chunks_paper_1=len(context_1_chunks),
+                chunks_paper_2=len(context_2_chunks),
+                arbitration=arbitration,
+                enabled=self.metrics_enabled,
+            )
             return analysis_result
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
+            duration = time.perf_counter() - started
+            record_pipeline_error(
+                llm_provider=self.llm_provider,
+                error_type=type(e).__name__,
+                duration_seconds=duration,
+                enabled=self.metrics_enabled,
+            )
             # We now catch both JSON parsing errors and Pydantic validation errors.
             return {
                 "error": f"LLM output failed validation: {e}",
+                "raw_response": raw_response if "raw_response" in locals() else None,
+            }
+        except Exception as e:  # noqa: BLE001
+            duration = time.perf_counter() - started
+            record_pipeline_error(
+                llm_provider=self.llm_provider,
+                error_type=type(e).__name__,
+                duration_seconds=duration,
+                enabled=self.metrics_enabled,
+            )
+            return {
+                "error": f"Pipeline execution failed: {e}",
                 "raw_response": raw_response if "raw_response" in locals() else None,
             }
 

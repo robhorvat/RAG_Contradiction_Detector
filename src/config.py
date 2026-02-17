@@ -4,6 +4,17 @@ from dataclasses import dataclass
 import os
 
 
+def _parse_bool(value: str | None, *, default: bool) -> bool:
+    if value is None:
+        return bool(default)
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return bool(default)
+
+
 @dataclass(frozen=True)
 class Settings:
     llm_provider: str
@@ -18,6 +29,9 @@ class Settings:
     verifier_override_confidence: float
     torch_verifier_checkpoint: str | None
     model_registry_latest_path: str
+    metrics_enabled: bool
+    metrics_host: str
+    metrics_port: int
 
 
 def load_settings() -> Settings:
@@ -25,6 +39,11 @@ def load_settings() -> Settings:
         override_confidence = float(os.getenv("VERIFIER_OVERRIDE_CONFIDENCE", "0.65"))
     except ValueError:
         override_confidence = 0.65
+    try:
+        metrics_port = int(os.getenv("METRICS_PORT", "9108"))
+    except ValueError:
+        metrics_port = 9108
+    metrics_port = max(1, min(65535, metrics_port))
 
     return Settings(
         llm_provider=os.getenv("LLM_PROVIDER", "openai").strip().lower(),
@@ -39,4 +58,7 @@ def load_settings() -> Settings:
         verifier_override_confidence=max(0.0, min(1.0, override_confidence)),
         torch_verifier_checkpoint=os.getenv("TORCH_VERIFIER_CHECKPOINT"),
         model_registry_latest_path=os.getenv("MODEL_REGISTRY_LATEST_PATH", "artifacts/model_registry_latest.json"),
+        metrics_enabled=_parse_bool(os.getenv("METRICS_ENABLED", "1"), default=True),
+        metrics_host=os.getenv("METRICS_HOST", "0.0.0.0").strip(),
+        metrics_port=metrics_port,
     )
