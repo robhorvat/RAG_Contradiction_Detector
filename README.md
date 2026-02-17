@@ -119,6 +119,10 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    ```bash
    make train-verifier
    ```
+10. **Inspect model registry entries:**
+   ```bash
+   make show-model-registry
+   ```
 
 Generated files:
 - `reports/eval_report.bootstrap.json`
@@ -126,6 +130,8 @@ Generated files:
 - `data/scifact/processed/train_pairs.jsonl`
 - `data/scifact/processed/dev_pairs.jsonl`
 - `artifacts/torch_verifier*/train_report.json`
+- `artifacts/model_registry.jsonl`
+- `artifacts/model_registry_latest.json`
 
 ### Trainable Verifier Notes
 - `scripts/prepare_scifact_pairs.py` creates claim-evidence NLI pairs from SciFact:
@@ -135,6 +141,16 @@ Generated files:
 - `scripts/train_torch_verifier.py` trains a small PyTorch NLI model and saves:
   - `artifacts/torch_verifier*/torch_nli_verifier.pt`
   - `artifacts/torch_verifier*/train_report.json`
+  - registry metadata entry in `artifacts/model_registry.jsonl`
+
+### Model Version Tracking
+- Every training run appends one line to `artifacts/model_registry.jsonl`.
+- Each registry entry captures:
+  - run ID and UTC timestamp
+  - checkpoint path + SHA256 hash
+  - dev metrics (`macro_f1`, `accuracy`, `loss`)
+  - dataset paths/sample counts and hyperparameters
+  - git commit/branch/dirty-state snapshot
 
 ## Docker Workflow (Recommended)
 

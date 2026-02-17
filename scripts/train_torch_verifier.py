@@ -6,12 +6,14 @@ import math
 import random
 from pathlib import Path
 import sys
+import os
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+from src.model_registry import append_jsonl, collect_git_metadata, sha256_file, utc_now_iso, write_json
 from src.verifier.torch_nli_verifier import (
     NLI_LABELS,
     PairNLIClassifier,
@@ -152,6 +154,9 @@ def main() -> None:
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--vocab-size", type=int, default=30000)
     parser.add_argument("--max-tokens", type=int, default=64)
+    parser.add_argument("--model-name", type=str, default="torch_nli_verifier")
+    parser.add_argument("--run-tag", type=str, default="")
+    parser.add_argument("--registry-path", type=Path, default=Path("artifacts/model_registry.jsonl"))
     args = parser.parse_args()
 
     rng = random.Random(int(args.seed))
@@ -254,18 +259,75 @@ def main() -> None:
         ckpt_path,
     )
 
+    ckpt_sha256 = sha256_file(ckpt_path)
+    git_meta = collect_git_metadata(ROOT)
+    timestamp = utc_now_iso()
+    commit_short = (git_meta.get("commit") or "nogit")[:8]
+    run_tag = args.run_tag.strip() if args.run_tag else ""
+    run_id_suffix = f"-{run_tag}" if run_tag else ""
+    run_id = f"{args.model_name}-{timestamp.replace(':', '').replace('+00:00', 'Z')}-{commit_short}{run_id_suffix}"
+
     report = {
         "status": "ok",
+        "run_id": run_id,
         "checkpoint": str(ckpt_path),
+        "checkpoint_sha256": ckpt_sha256,
         "device_used": str(device),
         "train_samples": len(train_rows),
         "dev_samples": len(dev_rows),
         "history": history,
         "final_dev": final_dev,
+        "git": git_meta,
     }
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    registry_entry = {
+        "run_id": run_id,
+        "created_at_utc": timestamp,
+        "model_name": str(args.model_name),
+        "task": "biomedical_claim_verification_nli",
+        "artifact": {
+            "checkpoint_path": str(ckpt_path),
+            "checkpoint_sha256": ckpt_sha256,
+            "checkpoint_bytes": ckpt_path.stat().st_size,
+            "report_path": str(report_path),
+        },
+        "metrics": {
+            "dev_macro_f1": final_dev["macro_f1"],
+            "dev_accuracy": final_dev["accuracy"],
+            "dev_loss": final_dev["loss"],
+        },
+        "data": {
+            "train_file": str(args.train_file),
+            "dev_file": str(args.dev_file),
+            "train_samples": len(train_rows),
+            "dev_samples": len(dev_rows),
+        },
+        "hyperparameters": {
+            "epochs": int(args.epochs),
+            "batch_size": int(args.batch_size),
+            "lr": float(args.lr),
+            "vocab_size": int(args.vocab_size),
+            "max_tokens": int(args.max_tokens),
+            "embed_dim": int(args.embed_dim),
+            "hidden_dim": int(args.hidden_dim),
+            "dropout": float(args.dropout),
+            "seed": int(args.seed),
+        },
+        "runtime": {
+            "device_used": str(device),
+            "torch_device_env": os.getenv("TORCH_DEVICE", "auto"),
+        },
+        "git": git_meta,
+    }
+    append_jsonl(args.registry_path, registry_entry)
+    latest_path = args.registry_path.with_name("model_registry_latest.json")
+    write_json(latest_path, registry_entry)
+
     print(f"Saved checkpoint: {ckpt_path}")
     print(f"Saved report: {report_path}")
+    print(f"Updated registry: {args.registry_path}")
+    print(f"Updated latest snapshot: {latest_path}")
 
 
 if __name__ == "__main__":

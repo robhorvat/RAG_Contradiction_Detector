@@ -5,7 +5,7 @@ endif
 REPORTS_DIR ?= reports
 ARTIFACTS_DIR ?= artifacts
 
-.PHONY: help app test smoke-local smoke-torch bootstrap-eval prep-scifact train-verifier train-verifier-quick docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
+.PHONY: help app test smoke-local smoke-torch bootstrap-eval prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
 
 help:
 	@echo "Common targets:"
@@ -17,6 +17,7 @@ help:
 	@echo "  make prep-scifact    - Download/process SciFact into train/dev pairs"
 	@echo "  make train-verifier  - Train torch verifier on processed SciFact pairs"
 	@echo "  make train-verifier-quick - Quick verifier training run for laptop smoke tests"
+	@echo "  make show-model-registry - Show recent registered model runs"
 	@echo "  make docker-build-cpu - Build CPU Docker image"
 	@echo "  make docker-up-cpu    - Run app in CPU Docker container"
 	@echo "  make docker-build-gpu - Build GPU-capable Docker image"
@@ -58,6 +59,9 @@ train-verifier-quick:
 		--batch-size 64 \
 		--max-train-samples 1200 \
 		--max-dev-samples 400
+
+show-model-registry:
+	$(PYTHON) scripts/show_model_registry.py --registry artifacts/model_registry.jsonl --limit 5
 
 docker-build-cpu:
 	docker compose build rag-app-cpu
