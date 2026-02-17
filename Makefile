@@ -5,7 +5,7 @@ endif
 REPORTS_DIR ?= reports
 ARTIFACTS_DIR ?= artifacts
 
-.PHONY: help app test smoke-local smoke-torch bootstrap-eval prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
+.PHONY: help app test smoke-local smoke-torch bootstrap-eval eval-report prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
 
 help:
 	@echo "Common targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make smoke-local     - Run no-network local baseline smoke test"
 	@echo "  make smoke-torch     - Run trainable torch verifier smoke test"
 	@echo "  make bootstrap-eval  - Generate a reproducible eval report template"
+	@echo "  make eval-report     - Run retrieval + verdict evaluation harness"
 	@echo "  make prep-scifact    - Download/process SciFact into train/dev pairs"
 	@echo "  make train-verifier  - Train torch verifier on processed SciFact pairs"
 	@echo "  make train-verifier-quick - Quick verifier training run for laptop smoke tests"
@@ -38,6 +39,14 @@ smoke-torch:
 
 bootstrap-eval:
 	$(PYTHON) scripts/bootstrap_eval_report.py --output $(REPORTS_DIR)/eval_report.bootstrap.json
+
+eval-report:
+	$(PYTHON) scripts/evaluate_rag_stack.py \
+		--pairs-file data/scifact/processed/dev_pairs.jsonl \
+		--scifact-claims-file data/scifact/raw/data/claims_dev.jsonl \
+		--scifact-corpus-file data/scifact/raw/data/corpus.jsonl \
+		--output-json $(REPORTS_DIR)/eval_report.json \
+		--output-md $(REPORTS_DIR)/eval_report.md
 
 prep-scifact:
 	$(PYTHON) scripts/prepare_scifact_pairs.py --data-root data/scifact

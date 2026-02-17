@@ -120,17 +120,23 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    ```bash
    make train-verifier-quick
    ```
-9. **Train torch verifier (full CPU run):**
+9. **Run full evaluation harness (retrieval + verdict metrics):**
+   ```bash
+   make eval-report
+   ```
+10. **Train torch verifier (full CPU run):**
    ```bash
    make train-verifier
    ```
-10. **Inspect model registry entries:**
+11. **Inspect model registry entries:**
    ```bash
    make show-model-registry
    ```
 
 Generated files:
 - `reports/eval_report.bootstrap.json`
+- `reports/eval_report.json`
+- `reports/eval_report.md`
 - `artifacts/` for future model/eval outputs
 - `data/scifact/processed/train_pairs.jsonl`
 - `data/scifact/processed/dev_pairs.jsonl`
@@ -156,6 +162,22 @@ Generated files:
   - dev metrics (`macro_f1`, `accuracy`, `loss`)
   - dataset paths/sample counts and hyperparameters
   - git commit/branch/dirty-state snapshot
+
+### Evaluation Harness (Reproducible)
+- Script: `scripts/evaluate_rag_stack.py`
+- Produces:
+  - `reports/eval_report.json` (machine-readable)
+  - `reports/eval_report.md` (human summary)
+- Metrics included:
+  - retrieval: `Recall@k`, `MRR@k` on SciFact claim-to-document lexical retrieval baseline
+  - verdict: `accuracy`, `macro_f1`, `contradiction_f1` for:
+    - `majority_unrelated`
+    - `heuristic` baseline
+    - `torch_verifier` (if checkpoint is available)
+- Quality gate:
+  - `macro_f1 >= 0.70`
+  - `delta_over_heuristic >= 0.10`
+  - gate status reported as `pass` / `fail` / `pending`
 
 ### Live Verdict Arbitration (LLM + Verifier)
 - The app keeps the LLM as first-pass reasoning, then optionally runs a trained Torch verifier on the extracted claims.
