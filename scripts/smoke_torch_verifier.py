@@ -21,7 +21,10 @@ def main() -> None:
         "Vitamin D supplementation reduced nonvertebral fracture risk in elderly adults.",
         "Vitamin D supplementation did not reduce nonvertebral fracture risk in elderly adults.",
     )
-    print(f"Torch smoke check verdict: {out['verdict']} (confidence={out['confidence']})")
+    print(
+        f"Torch smoke check verdict: {out['verdict']} "
+        f"(confidence={out['confidence']}, device={out['device']}, mode={out['device_mode']})"
+    )
 
 
 if __name__ == "__main__":

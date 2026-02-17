@@ -55,4 +55,6 @@ def test_torch_verifier_predict_contract():
     )
     assert out["verdict"] in NLI_LABELS
     assert 0.0 <= out["confidence"] <= 1.0
+    assert out["device"] in {"cpu", "cuda"}
+    assert out["device_mode"] in {"cpu-auto", "cuda-auto", "cpu-forced", "cuda-forced", "cuda-requested-but-unavailable"}
     assert set(out["label_probs"].keys()) == set(NLI_LABELS)

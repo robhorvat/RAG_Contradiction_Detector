@@ -145,6 +145,10 @@ Notes:
 - GPU profile uses a CUDA-enabled torch wheel (`cu121`).
 - CPU profile uses CPU-only torch wheels.
 - In both modes, code still checks `torch.cuda.is_available()`, so CPU fallback remains safe.
+- Device selection can be overridden with `TORCH_DEVICE`:
+  - `TORCH_DEVICE=auto` (default)
+  - `TORCH_DEVICE=cuda` (fallbacks to CPU if unavailable)
+  - `TORCH_DEVICE=cpu`
 
 ## Why Docker Now, Minikube Later?
 

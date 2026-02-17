@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 
+from src.verifier.torch_device import resolve_torch_device
+
 
 try:
     import torch
@@ -163,7 +165,9 @@ class TorchNLIVerifier:
         device: torch.device | None = None,
     ):
         self.config = config or TorchVerifierConfig()
-        self.device = device or torch.device("cpu")
+        auto_device, device_mode = resolve_torch_device(torch)
+        self.device = device or auto_device
+        self.device_mode = device_mode
         self.model = model.to(self.device)
         self.model.eval()
 
@@ -177,7 +181,7 @@ class TorchNLIVerifier:
             dropout=cfg.dropout,
             num_labels=cfg.num_labels,
         )
-        return cls(model=model, config=cfg, device=torch.device("cpu"))
+        return cls(model=model, config=cfg, device=None)
 
     def predict(self, claim_1: str, claim_2: str) -> dict:
         ids_a, mask_a, ids_b, mask_b = build_pair_batch(
@@ -194,5 +198,7 @@ class TorchNLIVerifier:
         return {
             "verdict": NLI_LABELS[pred_idx],
             "confidence": round(float(probs[pred_idx]), 4),
+            "device": str(self.device),
+            "device_mode": self.device_mode,
             "label_probs": {label: round(float(probs[i]), 4) for i, label in enumerate(NLI_LABELS)},
         }
