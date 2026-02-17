@@ -4,8 +4,10 @@ PYTHON := venv/bin/python
 endif
 REPORTS_DIR ?= reports
 ARTIFACTS_DIR ?= artifacts
+QUALITY_GATE_JSON ?= $(ARTIFACTS_DIR)/eval_gate_report.json
+QUALITY_GATE_MD ?= $(ARTIFACTS_DIR)/eval_gate_report.md
 
-.PHONY: help app test smoke-local smoke-torch bootstrap-eval eval-report prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
+.PHONY: help app test smoke-local smoke-torch bootstrap-eval eval-report quality-gate quality-gate-soft prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
 
 help:
 	@echo "Common targets:"
@@ -15,6 +17,8 @@ help:
 	@echo "  make smoke-torch     - Run trainable torch verifier smoke test"
 	@echo "  make bootstrap-eval  - Generate a reproducible eval report template"
 	@echo "  make eval-report     - Run retrieval + verdict evaluation harness"
+	@echo "  make quality-gate    - Strict quality gate check (non-pass exits with error)"
+	@echo "  make quality-gate-soft - Soft gate check for local diagnostics"
 	@echo "  make prep-scifact    - Download/process SciFact into train/dev pairs"
 	@echo "  make train-verifier  - Train torch verifier on processed SciFact pairs"
 	@echo "  make train-verifier-quick - Quick verifier training run for laptop smoke tests"
@@ -47,6 +51,24 @@ eval-report:
 		--scifact-corpus-file data/scifact/raw/data/corpus.jsonl \
 		--output-json $(REPORTS_DIR)/eval_report.json \
 		--output-md $(REPORTS_DIR)/eval_report.md
+
+quality-gate:
+	$(PYTHON) scripts/evaluate_rag_stack.py \
+		--pairs-file data/scifact/processed/dev_pairs.jsonl \
+		--scifact-claims-file data/scifact/raw/data/claims_dev.jsonl \
+		--scifact-corpus-file data/scifact/raw/data/corpus.jsonl \
+		--output-json $(QUALITY_GATE_JSON) \
+		--output-md $(QUALITY_GATE_MD)
+	$(PYTHON) scripts/check_quality_gate.py --report $(QUALITY_GATE_JSON)
+
+quality-gate-soft:
+	$(PYTHON) scripts/evaluate_rag_stack.py \
+		--pairs-file data/scifact/processed/dev_pairs.jsonl \
+		--scifact-claims-file data/scifact/raw/data/claims_dev.jsonl \
+		--scifact-corpus-file data/scifact/raw/data/corpus.jsonl \
+		--output-json $(QUALITY_GATE_JSON) \
+		--output-md $(QUALITY_GATE_MD)
+	$(PYTHON) scripts/check_quality_gate.py --report $(QUALITY_GATE_JSON) --allow-fail --allow-pending
 
 prep-scifact:
 	$(PYTHON) scripts/prepare_scifact_pairs.py --data-root data/scifact

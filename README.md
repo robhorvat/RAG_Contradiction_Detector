@@ -124,11 +124,16 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    ```bash
    make eval-report
    ```
-10. **Train torch verifier (full CPU run):**
+10. **Run gate check (strict in CI, soft locally):**
+   ```bash
+   make quality-gate-soft   # local diagnostic mode
+   # make quality-gate      # strict mode (fails if gate is fail/pending)
+   ```
+11. **Train torch verifier (full CPU run):**
    ```bash
    make train-verifier
    ```
-11. **Inspect model registry entries:**
+12. **Inspect model registry entries:**
    ```bash
    make show-model-registry
    ```
@@ -178,6 +183,16 @@ Generated files:
   - `macro_f1 >= 0.70`
   - `delta_over_heuristic >= 0.10`
   - gate status reported as `pass` / `fail` / `pending`
+
+### Quality Gate Enforcement
+- Script: `scripts/check_quality_gate.py`
+- Reads an evaluation report JSON (`--report ...`) and enforces gate status:
+  - strict mode (default): exits non-zero unless status is `pass`
+  - soft mode: allows non-pass statuses for local diagnostics
+- Make targets:
+  - `make quality-gate` (strict; CI-friendly)
+  - `make quality-gate-soft` (local iteration)
+- Gate targets evaluate into `artifacts/eval_gate_report.json` / `artifacts/eval_gate_report.md` so routine checks do not churn tracked report files.
 
 ### Live Verdict Arbitration (LLM + Verifier)
 - The app keeps the LLM as first-pass reasoning, then optionally runs a trained Torch verifier on the extracted claims.
