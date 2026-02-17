@@ -11,3 +11,4 @@ pydantic==2.11.7
 tenacity==9.0.0
 typing-extensions
 pytest
+torch

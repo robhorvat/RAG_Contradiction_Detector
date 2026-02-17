@@ -86,6 +86,7 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    source venv/bin/activate
    uv pip install -r requirements.txt
    ```
+   If torch install is slow on first run, this is expected (large wheel).
 2. **Run app:**
    ```bash
    make app
@@ -98,7 +99,11 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    ```bash
    make smoke-local
    ```
-5. **Generate a bootstrap evaluation report:**
+5. **Run trainable verifier smoke test (requires torch):**
+   ```bash
+   make smoke-torch
+   ```
+6. **Generate a bootstrap evaluation report:**
    ```bash
    make bootstrap-eval
    ```
@@ -106,6 +111,46 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
 Generated files:
 - `reports/eval_report.bootstrap.json`
 - `artifacts/` for future model/eval outputs
+
+## Docker Workflow (Recommended)
+
+Using Docker avoids local Python/package drift and makes onboarding much faster.
+
+### CPU (default, safest)
+```bash
+make docker-build-cpu
+make docker-up-cpu
+```
+Open: `http://localhost:8501`
+
+### GPU (optional, faster torch workloads)
+Prerequisites:
+- NVIDIA GPU
+- NVIDIA drivers
+- Docker Desktop / Docker Engine with NVIDIA container runtime enabled
+
+Run:
+```bash
+make docker-build-gpu
+make docker-up-gpu
+```
+Open: `http://localhost:8502`
+
+### Auto mode (GPU if available, otherwise CPU)
+```bash
+make docker-up-auto
+```
+
+Notes:
+- GPU profile uses a CUDA-enabled torch wheel (`cu121`).
+- CPU profile uses CPU-only torch wheels.
+- In both modes, code still checks `torch.cuda.is_available()`, so CPU fallback remains safe.
+
+## Why Docker Now, Minikube Later?
+
+- Docker solves your immediate pain: environment/package consistency.
+- Minikube is best used once we package an inference API deployment shape (Deployment/Service/ConfigMap/Secret and metrics endpoint).
+- We will add minikube manifests after the training + evaluation + API layer is stable, so Kubernetes config reflects real production behavior instead of placeholders.
 
 ## Future Work
 

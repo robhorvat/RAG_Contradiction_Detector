@@ -1,0 +1,41 @@
+services:
+  rag-app-cpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+    image: rag-contradiction-detector:cpu
+    env_file:
+      - .env
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./db:/app/db
+      - ./reports:/app/reports
+      - ./artifacts:/app/artifacts
+    restart: unless-stopped
+
+  rag-app-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu121
+    image: rag-contradiction-detector:gpu
+    env_file:
+      - .env
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+    gpus: all
+    profiles:
+      - gpu
+    ports:
+      - "8502:8501"
+    volumes:
+      - ./db:/app/db
+      - ./reports:/app/reports
+      - ./artifacts:/app/artifacts
+    restart: unless-stopped
