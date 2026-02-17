@@ -1,5 +1,7 @@
 import streamlit as st
 from dotenv import load_dotenv
+import json
+from pathlib import Path
 
 from src.agent.contradiction_checker import ContradictionChecker
 from src.agent.llm_clients import OpenAIJSONClient, GeminiJSONClient, LocalRuleBasedJSONClient
@@ -37,6 +39,32 @@ def _build_llm_client(settings):
     raise RuntimeError(f"Unsupported LLM_PROVIDER: {provider}")
 
 
+def _resolve_torch_checkpoint(settings):
+    if settings.torch_verifier_checkpoint:
+        path = Path(settings.torch_verifier_checkpoint)
+        if path.exists():
+            return path, "explicit"
+        return None, f"TORCH_VERIFIER_CHECKPOINT not found: {path}"
+
+    latest_path = Path(settings.model_registry_latest_path)
+    if not latest_path.exists():
+        return None, f"registry snapshot not found: {latest_path}"
+
+    try:
+        latest = json.loads(latest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None, f"invalid registry snapshot JSON: {latest_path}"
+
+    checkpoint = latest.get("artifact", {}).get("checkpoint_path")
+    if not checkpoint:
+        return None, f"checkpoint path missing from snapshot: {latest_path}"
+
+    checkpoint_path = Path(checkpoint)
+    if checkpoint_path.exists():
+        return checkpoint_path, "registry-latest"
+    return None, f"checkpoint in registry snapshot does not exist: {checkpoint_path}"
+
+
 @st.cache_resource
 def initialize_system():
     """
@@ -55,9 +83,34 @@ def initialize_system():
         cohere_model=settings.cohere_rerank_model,
     )
     llm_client = _build_llm_client(settings)
-    checker = ContradictionChecker(retriever=retriever, llm_client=llm_client)
+    runtime_notes = []
+    torch_verifier = None
 
-    return checker, chroma_manager, settings.openai_api_key, settings
+    if settings.verifier_backend == "torch":
+        ckpt_path, source_or_error = _resolve_torch_checkpoint(settings)
+        if ckpt_path is None:
+            runtime_notes.append(f"Torch verifier unavailable: {source_or_error}. Using LLM-only verdict.")
+        else:
+            try:
+                from src.verifier.torch_nli_verifier import TorchNLIVerifier
+
+                torch_verifier = TorchNLIVerifier.from_checkpoint(ckpt_path)
+                runtime_notes.append(
+                    f"Torch verifier loaded from {source_or_error}: `{ckpt_path}` "
+                    f"(device={torch_verifier.device}, mode={torch_verifier.device_mode})"
+                )
+            except Exception as exc:  # noqa: BLE001
+                runtime_notes.append(f"Torch verifier failed to load ({ckpt_path}): {exc}. Using LLM-only verdict.")
+
+    checker = ContradictionChecker(
+        retriever=retriever,
+        llm_client=llm_client,
+        torch_verifier=torch_verifier,
+        verifier_strategy=settings.verifier_strategy,
+        verifier_override_confidence=settings.verifier_override_confidence,
+    )
+
+    return checker, chroma_manager, settings.openai_api_key, settings, runtime_notes
 
 
 def ensure_papers_are_in_db(paper_ids: list[str], chroma_manager: ChromaManager, openai_key: str):
@@ -89,11 +142,19 @@ except RuntimeError as exc:
     st.error(str(exc))
     st.stop()
 
-checker_agent, chroma_manager, openai_key, settings = components
+checker_agent, chroma_manager, openai_key, settings, runtime_notes = components
 
 st.title("🔎 Biomedical Contradiction Detector")
 st.markdown("This app uses a RAG pipeline to analyze scientific papers. Enter any two PubMed IDs to begin.")
 st.caption(f"LLM provider: `{settings.llm_provider}`")
+st.caption(
+    "Verdict strategy: "
+    f"`{settings.verifier_strategy}` | "
+    f"Verifier backend: `{settings.verifier_backend}` | "
+    f"Override threshold: `{settings.verifier_override_confidence}`"
+)
+for note in runtime_notes:
+    st.caption(note)
 
 if 'analysis_result' not in st.session_state: st.session_state.analysis_result = None
 
@@ -136,8 +197,11 @@ if st.session_state.analysis_result:
         st.error(f"**Error:** {result['error']}")
     else:
         verdict = result.get("analysis", {}).get("verdict", "Unknown")
+        llm_verdict = result.get("analysis", {}).get("llm_verdict", verdict)
+        verdict_source = result.get("analysis", {}).get("verdict_source", "llm")
         color = "red" if verdict == "Contradictory" else "orange" if verdict == "Unrelated" else "green"
         st.markdown(f"### Verdict: <span style='color:{color};'>{verdict}</span>", unsafe_allow_html=True)
+        st.caption(f"Final source: `{verdict_source}` | LLM verdict: `{llm_verdict}`")
         st.info(f"**Justification:** {result.get('analysis', {}).get('justification', 'N/A')}")
         baseline = result.get("baseline_verifier")
         if baseline:
@@ -147,6 +211,18 @@ if st.session_state.analysis_result:
                 f"(confidence={baseline.get('confidence', 'n/a')}, "
                 f"overlap={baseline.get('overlap_ratio', 'n/a')})"
             )
+        torch_verifier = result.get("torch_verifier")
+        if torch_verifier:
+            st.caption(
+                "Torch verifier: "
+                f"{torch_verifier.get('verdict', 'Unknown')} "
+                f"(confidence={torch_verifier.get('confidence', 'n/a')}, "
+                f"device={torch_verifier.get('device', 'n/a')}, "
+                f"mode={torch_verifier.get('device_mode', 'n/a')})"
+            )
+        arbitration = result.get("verifier_arbitration")
+        if arbitration:
+            st.caption(f"Arbitration reason: {arbitration.get('reason', 'n/a')}")
         col1, col2 = st.columns(2)
         with col1, st.container(border=True):
             st.subheader(f"Claim from Paper 1 ({pids[0]})")

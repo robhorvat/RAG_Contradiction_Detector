@@ -66,6 +66,11 @@ I designed this project to be a robust prototype, focusing on engineering decisi
       COHERE_API_KEY="..."
       GEMINI_API_KEY="..."  # optional if LLM_PROVIDER="gemini"
       LLM_PROVIDER="openai" # one of: openai, gemini, local
+      VERIFIER_BACKEND="heuristic" # heuristic or torch
+      VERIFIER_STRATEGY="confidence_override" # llm_only, confidence_override, verifier_only
+      VERIFIER_OVERRIDE_CONFIDENCE="0.65"
+      TORCH_VERIFIER_CHECKPOINT="" # optional explicit .pt path
+      MODEL_REGISTRY_LATEST_PATH="artifacts/model_registry_latest.json"
       ```
     *   If you choose Gemini provider, install support once:
       ```bash
@@ -151,6 +156,18 @@ Generated files:
   - dev metrics (`macro_f1`, `accuracy`, `loss`)
   - dataset paths/sample counts and hyperparameters
   - git commit/branch/dirty-state snapshot
+
+### Live Verdict Arbitration (LLM + Verifier)
+- The app keeps the LLM as first-pass reasoning, then optionally runs a trained Torch verifier on the extracted claims.
+- Arbitration policies:
+  - `llm_only`: always trust LLM verdict.
+  - `confidence_override`: use verifier verdict only when it disagrees and confidence is above threshold.
+  - `verifier_only`: always trust verifier when available.
+- UI now shows:
+  - final verdict
+  - original LLM verdict
+  - verdict source (`llm` or `torch_verifier`)
+  - arbitration reason
 
 ## Docker Workflow (Recommended)
 

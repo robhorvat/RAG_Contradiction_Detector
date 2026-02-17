@@ -14,6 +14,7 @@ from src.agent.schemas import LLMResponse
 from src.agent.llm_clients import OpenAIJSONClient
 from src.retrieval.retriever import AdvancedRetriever
 from src.verifier.heuristic_verifier import HeuristicContradictionVerifier
+from src.verifier.verdict_arbitration import arbitrate_verdict
 from src.vector_store.chroma_manager import ChromaManager
 from src.data_ingestion.pubmed_fetcher import get_paper_details
 from src.processing.text_splitter import chunk_text_semantically
@@ -31,10 +32,21 @@ class ContradictionChecker:
     The core RAG agent that orchestrates the retrieval and analysis of scientific papers.
     """
 
-    def __init__(self, retriever: AdvancedRetriever, llm_client):
+    def __init__(
+        self,
+        retriever: AdvancedRetriever,
+        llm_client,
+        *,
+        torch_verifier=None,
+        verifier_strategy: str = "llm_only",
+        verifier_override_confidence: float = 0.65,
+    ):
         self.retriever = retriever
         self.llm_client = llm_client
         self.heuristic_verifier = HeuristicContradictionVerifier()
+        self.torch_verifier = torch_verifier
+        self.verifier_strategy = verifier_strategy
+        self.verifier_override_confidence = float(verifier_override_confidence)
         self.system_prompt = self._get_system_prompt()
 
     def _get_system_prompt(self):
@@ -90,10 +102,29 @@ class ContradictionChecker:
                 analysis_result["paper_1_claim"],
                 analysis_result["paper_2_claim"],
             )
+            torch_prediction = None
+            if self.torch_verifier is not None:
+                torch_prediction = self.torch_verifier.predict(
+                    analysis_result["paper_1_claim"],
+                    analysis_result["paper_2_claim"],
+                )
+
+            llm_verdict = analysis_result["analysis"]["verdict"]
+            final_verdict, arbitration = arbitrate_verdict(
+                llm_verdict=llm_verdict,
+                verifier_prediction=torch_prediction,
+                strategy=self.verifier_strategy,
+                override_confidence=self.verifier_override_confidence,
+            )
+            analysis_result["analysis"]["llm_verdict"] = llm_verdict
+            analysis_result["analysis"]["verdict"] = final_verdict
+            analysis_result["analysis"]["verdict_source"] = arbitration["selected_source"]
 
             analysis_result['evidence_paper_1'] = [chunk['text'] for chunk in context_1_chunks]
             analysis_result['evidence_paper_2'] = [chunk['text'] for chunk in context_2_chunks]
             analysis_result['baseline_verifier'] = baseline
+            analysis_result['torch_verifier'] = torch_prediction
+            analysis_result['verifier_arbitration'] = arbitration
             return analysis_result
         except (json.JSONDecodeError, ValidationError, ValueError) as e:
             # We now catch both JSON parsing errors and Pydantic validation errors.
