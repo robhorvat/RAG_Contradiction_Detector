@@ -22,3 +22,5 @@ data/scifact/processed/
 
 # Environment variables
 .env
+.DS_Store
+.venv
