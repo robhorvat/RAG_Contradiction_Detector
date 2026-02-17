@@ -4,7 +4,7 @@ metadata:
   name: rag-detector-config
 data:
   LLM_PROVIDER: "openai"
-  VERIFIER_BACKEND: "torch"
+  VERIFIER_BACKEND: "heuristic"
   VERIFIER_STRATEGY: "confidence_override"
   VERIFIER_OVERRIDE_CONFIDENCE: "0.65"
   MODEL_REGISTRY_LATEST_PATH: "artifacts/model_registry_latest.json"

@@ -32,6 +32,41 @@ I designed this project to be a robust prototype, focusing on engineering decisi
 
 *   **Trust and Transparency in the UI:** The Streamlit UI was designed to build user trust. It doesn't just show a verdict; it includes expandable sections that display the **exact evidence passages** the agent used for its analysis, making the reasoning process transparent.
 
+## Architecture
+
+```mermaid
+flowchart LR
+    A[PubMed IDs + Topic] --> B[PubMed Ingestion]
+    B --> C[Semantic Chunking]
+    C --> D[Chroma Retrieval]
+    D --> E[Cohere Re-rank Optional]
+    E --> F[LLM Claim Extraction + Initial Verdict]
+    F --> G[Heuristic Baseline]
+    F --> H[Torch NLI Verifier Optional]
+    H --> I[Verdict Arbitration]
+    G --> I
+    I --> J[Streamlit UI + Evidence]
+    I --> K[Prometheus Metrics]
+    H --> L[Model Registry + Checkpoints]
+    L --> M[Evaluation + Quality Gate]
+```
+
+## Evaluation Snapshot
+
+Latest reproducible harness run (`make eval-report`, 2026-02-17 UTC):
+
+- Retrieval baseline on SciFact claims:
+  - `Recall@1 = 0.3989`
+  - `Recall@10 = 0.6064`
+  - `MRR@10 = 0.4679`
+- Verdict metrics on SciFact dev pairs (`n=638`):
+  - `majority_unrelated macro_f1 = 0.2132`
+  - `heuristic macro_f1 = 0.4925`
+  - `torch_verifier macro_f1 = 0.2452`
+- Quality gate (`macro_f1 >= 0.70` and `delta_over_heuristic >= 0.10`):
+  - current status: `fail` (expected at this training stage)
+  - this is intentional and acts as a regression barrier in strict mode
+
 ## Key Learnings from Development
 
 *   **The Importance of a Stateless Architecture:** Early versions of the Streamlit app suffered from "zombie" database connections due to a conflict between caching and file deletion. I re-architected the app to be stateless on startup, guaranteeing a clean, predictable database state for every session.
@@ -60,7 +95,11 @@ I designed this project to be a robust prototype, focusing on engineering decisi
     pip install -r requirements.txt
     ```
 3.  **Add API Keys:**
-    *   Create a `.env` file in the project root with your keys:
+    *   Start from the template:
+      ```bash
+      cp .env.example .env
+      ```
+    *   Then update `.env` with your keys:
       ```
       OPENAI_API_KEY="sk-..."
       COHERE_API_KEY="..."
@@ -291,6 +330,11 @@ Manifests are in `k8s/`:
 - `k8s/configmap.yaml` (non-secret runtime config)
 - `k8s/secret.example.yaml` (secret template, do not commit real keys)
 
+Default Kubernetes runtime uses `VERIFIER_BACKEND=heuristic` to avoid boot warnings when no model artifacts are bundled into the image.
+To enable Torch verifier in Kubernetes, provide checkpoint artifacts inside the container image or a mounted volume and set:
+- `VERIFIER_BACKEND=torch`
+- `MODEL_REGISTRY_LATEST_PATH` to a valid in-container registry snapshot path
+
 ### Deploy to Minikube
 1. Start minikube:
    ```bash
@@ -324,10 +368,33 @@ Manifests are in `k8s/`:
 - Minikube is best used once we package an inference API deployment shape (Deployment/Service/ConfigMap/Secret and metrics endpoint).
 - We will add minikube manifests after the training + evaluation + API layer is stable, so Kubernetes config reflects real production behavior instead of placeholders.
 
-## Future Work
+## Responsible AI Controls
 
-This project is a strong proof-of-concept. To evolve it into a production-ready tool, I would focus on:
+- Evidence-grounded prompting: model is instructed to use retrieved passages only.
+- Transparent outputs: claims, evidence snippets, baseline verdict, arbitration reason are shown to users.
+- Fallback behavior: if verifier artifact is missing or confidence is below threshold, pipeline keeps conservative LLM verdict flow.
+- Regression checks: strict quality gate blocks promotion when target metrics are not met.
 
-*   **Quantitative Evaluation:** Implementing a formal evaluation framework like RAGAs to benchmark the system's accuracy on a curated dataset of paper pairs.
-*   **Full-Text Analysis:** Moving beyond abstracts to ingest and analyze full-text PDFs using a tool like Grobid or Unstructured.
-*   **Production Hygiene:** Containerizing the application with Docker and setting up a CI/CD pipeline for automated testing and deployment.
+## Limitations
+
+- Current ingestion focuses on abstracts, not full-text PDFs.
+- SciFact does not perfectly match every biomedical contradiction pattern in PubMed.
+- Torch verifier quality is currently below production threshold and needs further training/data curation.
+- Streamlit-first app architecture is ideal for demos, but API-first service split is preferable for large-scale serving.
+
+## Roadmap
+
+1. Improve verifier performance with better class balancing and hard-negative mining.
+2. Add curated PubMed contradiction gold set and weekly regression evaluations.
+3. Add API service split (`FastAPI`) for cleaner serving + autoscaling patterns.
+4. Add Prometheus + Grafana dashboard bundle and alert rules.
+5. Expand ingestion to full-text documents with explicit provenance tracing.
+
+## Interview Talk Track
+
+1. Problem framing: researchers face contradictory biomedical findings and need evidence-grounded triage.
+2. Core design decision: combine RAG extraction with explicit verifier arbitration instead of prompt-only verdicts.
+3. ML rigor: ship baseline + trainable model + reproducible evaluation + hard quality gate.
+4. MLOps shape: Dockerized runtime, GitHub Actions CI, minikube manifests, health checks, Prometheus metrics.
+5. Engineering tradeoff: default Kubernetes verifier is heuristic unless model artifacts are mounted, to keep runtime reliable.
+6. Honest status: retrieval and baseline are strong; verifier still needs quality improvements, and the gate correctly blocks release.
