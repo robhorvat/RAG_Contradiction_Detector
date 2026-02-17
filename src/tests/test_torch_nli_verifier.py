@@ -58,3 +58,17 @@ def test_torch_verifier_predict_contract():
     assert out["device"] in {"cpu", "cuda"}
     assert out["device_mode"] in {"cpu-auto", "cuda-auto", "cpu-forced", "cuda-forced", "cuda-requested-but-unavailable"}
     assert set(out["label_probs"].keys()) == set(NLI_LABELS)
+
+
+def test_checkpoint_roundtrip(tmp_path):
+    cfg = TorchVerifierConfig(vocab_size=4000, max_tokens=24, embed_dim=32, hidden_dim=64, dropout=0.1)
+    verifier = TorchNLIVerifier.build_fresh(cfg)
+    ckpt_path = tmp_path / "verifier.pt"
+    torch.save(verifier.to_checkpoint_dict(), ckpt_path)
+
+    loaded = TorchNLIVerifier.from_checkpoint(ckpt_path)
+    out = loaded.predict(
+        "Vitamin D supplementation reduces fracture incidence in older adults.",
+        "Vitamin D supplementation does not reduce fracture incidence in older adults.",
+    )
+    assert out["verdict"] in NLI_LABELS

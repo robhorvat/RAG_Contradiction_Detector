@@ -12,4 +12,6 @@ venv
 db
 reports
 artifacts
+data/scifact/raw
+data/scifact/processed
 RAG_Demo.gif

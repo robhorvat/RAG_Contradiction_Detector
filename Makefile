@@ -5,7 +5,7 @@ endif
 REPORTS_DIR ?= reports
 ARTIFACTS_DIR ?= artifacts
 
-.PHONY: help app test smoke-local smoke-torch bootstrap-eval docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
+.PHONY: help app test smoke-local smoke-torch bootstrap-eval prep-scifact train-verifier train-verifier-quick docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
 
 help:
 	@echo "Common targets:"
@@ -14,6 +14,9 @@ help:
 	@echo "  make smoke-local     - Run no-network local baseline smoke test"
 	@echo "  make smoke-torch     - Run trainable torch verifier smoke test"
 	@echo "  make bootstrap-eval  - Generate a reproducible eval report template"
+	@echo "  make prep-scifact    - Download/process SciFact into train/dev pairs"
+	@echo "  make train-verifier  - Train torch verifier on processed SciFact pairs"
+	@echo "  make train-verifier-quick - Quick verifier training run for laptop smoke tests"
 	@echo "  make docker-build-cpu - Build CPU Docker image"
 	@echo "  make docker-up-cpu    - Run app in CPU Docker container"
 	@echo "  make docker-build-gpu - Build GPU-capable Docker image"
@@ -34,6 +37,27 @@ smoke-torch:
 
 bootstrap-eval:
 	$(PYTHON) scripts/bootstrap_eval_report.py --output $(REPORTS_DIR)/eval_report.bootstrap.json
+
+prep-scifact:
+	$(PYTHON) scripts/prepare_scifact_pairs.py --data-root data/scifact
+
+train-verifier:
+	$(PYTHON) scripts/train_torch_verifier.py \
+		--train-file data/scifact/processed/train_pairs.jsonl \
+		--dev-file data/scifact/processed/dev_pairs.jsonl \
+		--output-dir artifacts/torch_verifier \
+		--epochs 6 \
+		--batch-size 64
+
+train-verifier-quick:
+	$(PYTHON) scripts/train_torch_verifier.py \
+		--train-file data/scifact/processed/train_pairs.jsonl \
+		--dev-file data/scifact/processed/dev_pairs.jsonl \
+		--output-dir artifacts/torch_verifier_quick \
+		--epochs 2 \
+		--batch-size 64 \
+		--max-train-samples 1200 \
+		--max-dev-samples 400
 
 docker-build-cpu:
 	docker compose build rag-app-cpu

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+from pathlib import Path
 
 from src.verifier.torch_device import resolve_torch_device
 
@@ -151,6 +152,27 @@ class TorchVerifierConfig:
     dropout: float = 0.2
     num_labels: int = 3
 
+    def to_dict(self) -> dict:
+        return {
+            "vocab_size": int(self.vocab_size),
+            "max_tokens": int(self.max_tokens),
+            "embed_dim": int(self.embed_dim),
+            "hidden_dim": int(self.hidden_dim),
+            "dropout": float(self.dropout),
+            "num_labels": int(self.num_labels),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "TorchVerifierConfig":
+        return cls(
+            vocab_size=int(data.get("vocab_size", 30000)),
+            max_tokens=int(data.get("max_tokens", 64)),
+            embed_dim=int(data.get("embed_dim", 96)),
+            hidden_dim=int(data.get("hidden_dim", 128)),
+            dropout=float(data.get("dropout", 0.2)),
+            num_labels=int(data.get("num_labels", 3)),
+        )
+
 
 class TorchNLIVerifier:
     """
@@ -182,6 +204,27 @@ class TorchNLIVerifier:
             num_labels=cfg.num_labels,
         )
         return cls(model=model, config=cfg, device=None)
+
+    @classmethod
+    def from_checkpoint(cls, checkpoint_path: str | Path) -> "TorchNLIVerifier":
+        ckpt = torch.load(str(checkpoint_path), map_location="cpu", weights_only=False)
+        cfg = TorchVerifierConfig.from_dict(ckpt.get("config", {}))
+        model = PairNLIClassifier(
+            vocab_size=cfg.vocab_size,
+            embed_dim=cfg.embed_dim,
+            hidden_dim=cfg.hidden_dim,
+            dropout=cfg.dropout,
+            num_labels=cfg.num_labels,
+        )
+        model.load_state_dict(ckpt["model_state"])
+        return cls(model=model, config=cfg, device=None)
+
+    def to_checkpoint_dict(self) -> dict:
+        return {
+            "config": self.config.to_dict(),
+            "model_state": self.model.state_dict(),
+            "labels": list(NLI_LABELS),
+        }
 
     def predict(self, claim_1: str, claim_2: str) -> dict:
         ids_a, mask_a, ids_b, mask_b = build_pair_batch(

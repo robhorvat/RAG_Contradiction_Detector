@@ -11,6 +11,12 @@ venv/
 # Local Databases
 db/
 
+# Generated artifacts and local training data
+artifacts/*
+!artifacts/.gitkeep
+data/scifact/raw/
+data/scifact/processed/
+
 # IDE files
 .idea/
 

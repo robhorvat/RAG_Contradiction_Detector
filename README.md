@@ -107,10 +107,34 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    ```bash
    make bootstrap-eval
    ```
+7. **Prepare SciFact training pairs (real dataset):**
+   ```bash
+   make prep-scifact
+   ```
+8. **Train torch verifier (quick smoke run):**
+   ```bash
+   make train-verifier-quick
+   ```
+9. **Train torch verifier (full CPU run):**
+   ```bash
+   make train-verifier
+   ```
 
 Generated files:
 - `reports/eval_report.bootstrap.json`
 - `artifacts/` for future model/eval outputs
+- `data/scifact/processed/train_pairs.jsonl`
+- `data/scifact/processed/dev_pairs.jsonl`
+- `artifacts/torch_verifier*/train_report.json`
+
+### Trainable Verifier Notes
+- `scripts/prepare_scifact_pairs.py` creates claim-evidence NLI pairs from SciFact:
+  - `SUPPORT -> Supporting`
+  - `CONTRADICT -> Contradictory`
+  - sampled non-evidence docs -> `Unrelated`
+- `scripts/train_torch_verifier.py` trains a small PyTorch NLI model and saves:
+  - `artifacts/torch_verifier*/torch_nli_verifier.pt`
+  - `artifacts/torch_verifier*/train_report.json`
 
 ## Docker Workflow (Recommended)
 
