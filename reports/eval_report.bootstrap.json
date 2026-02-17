@@ -1,0 +1,29 @@
+{
+  "project": "RAG_Contradiction_Detector",
+  "run_type": "bootstrap_template",
+  "generated_at_utc": "2026-02-17T16:55:55+00:00",
+  "data": {
+    "eval_split": "tbd",
+    "n_samples": null,
+    "notes": "Replace placeholders once evaluation harness is implemented."
+  },
+  "metrics": {
+    "retrieval": {
+      "recall_at_k": null,
+      "mrr_at_k": null
+    },
+    "verdict": {
+      "macro_f1": null,
+      "contradiction_f1": null
+    }
+  },
+  "baselines": {
+    "heuristic_verdict_macro_f1": null,
+    "llm_only_verdict_macro_f1": null
+  },
+  "quality_gate": {
+    "target_macro_f1_min": 0.7,
+    "target_delta_over_heuristic_min": 0.1,
+    "status": "pending"
+  }
+}

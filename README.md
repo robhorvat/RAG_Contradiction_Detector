@@ -39,7 +39,8 @@ I designed this project to be a robust prototype, focusing on engineering decisi
 
 ## Technical Stack
 
-*   **LLM & Agent Logic:** OpenAI GPT-4o (with JSON Mode for structured output)
+*   **LLM & Agent Logic:** OpenAI / Gemini / Local deterministic baseline (JSON-structured outputs)
+*   **Classical Baseline:** Heuristic contradiction verifier (lexical overlap + polarity) for ablations
 *   **Retrieval:** ChromaDB, Cohere Re-ranker
 *   **Text Processing:** LangChain (for Semantic Chunking)
 *   **Data Ingestion:** PubMed API
@@ -63,11 +64,48 @@ I designed this project to be a robust prototype, focusing on engineering decisi
       ```
       OPENAI_API_KEY="sk-..."
       COHERE_API_KEY="..."
+      GEMINI_API_KEY="..."  # optional if LLM_PROVIDER="gemini"
+      LLM_PROVIDER="openai" # one of: openai, gemini, local
+      ```
+    *   If you choose Gemini provider, install support once:
+      ```bash
+      pip install google-generativeai
       ```
 4.  **Run the application:**
     ```bash
     python -m streamlit run app.py
     ```
+
+## Developer Workflow (Step-by-Step)
+
+This repo now includes lightweight reproducibility scaffolding for evaluation and local checks.
+
+1. **Create and activate environment (uv):**
+   ```bash
+   uv venv venv --python 3.10
+   source venv/bin/activate
+   uv pip install -r requirements.txt
+   ```
+2. **Run app:**
+   ```bash
+   make app
+   ```
+3. **Run unit tests:**
+   ```bash
+   make test
+   ```
+4. **Run a no-network smoke test (local baseline):**
+   ```bash
+   make smoke-local
+   ```
+5. **Generate a bootstrap evaluation report:**
+   ```bash
+   make bootstrap-eval
+   ```
+
+Generated files:
+- `reports/eval_report.bootstrap.json`
+- `artifacts/` for future model/eval outputs
 
 ## Future Work
 
