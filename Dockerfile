@@ -21,7 +21,7 @@ RUN grep -vE '^torch([<=>].*)?$' /app/requirements.txt > /tmp/requirements.no_to
 
 COPY . /app
 
-EXPOSE 8501
+EXPOSE 8501 9108
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=3)"

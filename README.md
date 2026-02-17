@@ -140,6 +140,17 @@ This repo now includes lightweight reproducibility scaffolding for evaluation an
    ```bash
    make show-model-registry
    ```
+13. **Run CI-equivalent local checks:**
+   ```bash
+   make ci
+   ```
+14. **Prepare minikube deployment assets:**
+   ```bash
+   make minikube-build-image
+   make minikube-secret-from-env
+   make minikube-deploy
+   make minikube-status
+   ```
 
 Generated files:
 - `reports/eval_report.bootstrap.json`
@@ -196,6 +207,15 @@ Generated files:
   - `make quality-gate` (strict; CI-friendly)
   - `make quality-gate-soft` (local iteration)
 - Gate targets evaluate into `artifacts/eval_gate_report.json` / `artifacts/eval_gate_report.md` so routine checks do not churn tracked report files.
+
+### CI/CD (GitHub Actions)
+- Workflow: `.github/workflows/ci.yml`
+- Runs on push/PR:
+  - `make lint` (compile-based lint)
+  - `pytest` unit tests
+  - `make smoke-local` no-network smoke
+  - Docker image build (`docker build -t rag-contradiction-detector:ci .`)
+- This gives a concrete gate before deployment and demonstrates reproducible packaging.
 
 ### Live Verdict Arbitration (LLM + Verifier)
 - The app keeps the LLM as first-pass reasoning, then optionally runs a trained Torch verifier on the extracted claims.
@@ -263,7 +283,42 @@ Notes:
   - `TORCH_DEVICE=cuda` (fallbacks to CPU if unavailable)
   - `TORCH_DEVICE=cpu`
 
-## Why Docker Now, Minikube Later?
+## Kubernetes (Minikube)
+
+Manifests are in `k8s/`:
+- `k8s/deployment.yaml` (Deployment with readiness/liveness probes)
+- `k8s/service.yaml` (NodePort Service for app + metrics)
+- `k8s/configmap.yaml` (non-secret runtime config)
+- `k8s/secret.example.yaml` (secret template, do not commit real keys)
+
+### Deploy to Minikube
+1. Start minikube:
+   ```bash
+   minikube start
+   ```
+2. Build image in minikube runtime:
+   ```bash
+   make minikube-build-image
+   ```
+3. Create/update Kubernetes secret from local `.env`:
+   ```bash
+   make minikube-secret-from-env
+   ```
+   This target only injects API keys and parses quoted `.env` values correctly.
+4. Apply manifests:
+   ```bash
+   make minikube-deploy
+   make minikube-status
+   ```
+5. Access app and metrics:
+   ```bash
+   minikube service -n rag-contradiction rag-detector --url
+   ```
+   The service exposes:
+   - Streamlit app on port `8501`
+   - Prometheus metrics on port `9108`
+
+## Why Docker + Minikube
 
 - Docker solves your immediate pain: environment/package consistency.
 - Minikube is best used once we package an inference API deployment shape (Deployment/Service/ConfigMap/Secret and metrics endpoint).

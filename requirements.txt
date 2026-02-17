@@ -9,6 +9,7 @@ streamlit==1.49.1
 pandas==2.1.4
 pydantic==2.11.7
 tenacity==9.0.0
+PyYAML==6.0.3
 typing-extensions
 pytest
 torch

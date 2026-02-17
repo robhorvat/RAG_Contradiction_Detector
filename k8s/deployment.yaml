@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rag-detector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rag-detector
+  template:
+    metadata:
+      labels:
+        app: rag-detector
+    spec:
+      containers:
+        - name: rag-detector
+          image: rag-contradiction-detector:cpu
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8501
+            - name: metrics
+              containerPort: 9108
+          envFrom:
+            - configMapRef:
+                name: rag-detector-config
+            - secretRef:
+                name: rag-detector-secrets
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "768Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"

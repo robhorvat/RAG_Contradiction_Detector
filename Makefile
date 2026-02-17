@@ -6,13 +6,17 @@ REPORTS_DIR ?= reports
 ARTIFACTS_DIR ?= artifacts
 QUALITY_GATE_JSON ?= $(ARTIFACTS_DIR)/eval_gate_report.json
 QUALITY_GATE_MD ?= $(ARTIFACTS_DIR)/eval_gate_report.md
+K8S_NAMESPACE ?= rag-contradiction
+MINIKUBE_PROFILE ?= minikube
 
-.PHONY: help app test smoke-local smoke-torch bootstrap-eval eval-report quality-gate quality-gate-soft prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto
+.PHONY: help lint app test ci smoke-local smoke-torch bootstrap-eval eval-report quality-gate quality-gate-soft prep-scifact train-verifier train-verifier-quick show-model-registry docker-build-cpu docker-up-cpu docker-build-gpu docker-up-gpu docker-up-auto minikube-build-image minikube-namespace minikube-secret-from-env minikube-deploy minikube-status
 
 help:
 	@echo "Common targets:"
+	@echo "  make lint            - Python syntax/lint checks (compile-only)"
 	@echo "  make app             - Run the Streamlit app"
 	@echo "  make test            - Run unit tests"
+	@echo "  make ci              - Lint + tests + local smoke check"
 	@echo "  make smoke-local     - Run no-network local baseline smoke test"
 	@echo "  make smoke-torch     - Run trainable torch verifier smoke test"
 	@echo "  make bootstrap-eval  - Generate a reproducible eval report template"
@@ -28,12 +32,21 @@ help:
 	@echo "  make docker-build-gpu - Build GPU-capable Docker image"
 	@echo "  make docker-up-gpu    - Run app in GPU Docker container"
 	@echo "  make docker-up-auto   - Auto-select GPU if available, else CPU"
+	@echo "  make minikube-build-image - Build image directly inside minikube runtime"
+	@echo "  make minikube-secret-from-env - Create/update K8s secret from .env"
+	@echo "  make minikube-deploy  - Apply minikube Deployment/Service/ConfigMap"
+	@echo "  make minikube-status  - Show pod/service status in minikube namespace"
+
+lint:
+	$(PYTHON) -m compileall -q app.py src scripts
 
 app:
 	$(PYTHON) -m streamlit run app.py
 
 test:
 	$(PYTHON) -m pytest -q
+
+ci: lint test smoke-local
 
 smoke-local:
 	LLM_PROVIDER=local $(PYTHON) scripts/smoke_local_pipeline.py
@@ -108,3 +121,26 @@ docker-up-gpu:
 
 docker-up-auto:
 	bash scripts/docker_up_auto.sh
+
+minikube-build-image:
+	minikube -p $(MINIKUBE_PROFILE) image build -t rag-contradiction-detector:cpu .
+
+minikube-namespace:
+	kubectl create namespace $(K8S_NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+
+minikube-secret-from-env: minikube-namespace
+	@if [ ! -f .env ]; then echo "Missing .env file for secret generation."; exit 1; fi
+	@bash -lc 'set -a; source .env; set +a; \
+		kubectl -n $(K8S_NAMESPACE) create secret generic rag-detector-secrets \
+			--from-literal=OPENAI_API_KEY="$$OPENAI_API_KEY" \
+			--from-literal=COHERE_API_KEY="$$COHERE_API_KEY" \
+			--from-literal=GEMINI_API_KEY="$$GEMINI_API_KEY" \
+			--dry-run=client -o yaml | kubectl apply -f -'
+
+minikube-deploy: minikube-namespace
+	kubectl -n $(K8S_NAMESPACE) apply -f k8s/configmap.yaml
+	kubectl -n $(K8S_NAMESPACE) apply -f k8s/deployment.yaml
+	kubectl -n $(K8S_NAMESPACE) apply -f k8s/service.yaml
+
+minikube-status:
+	kubectl -n $(K8S_NAMESPACE) get pods,svc
