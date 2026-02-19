@@ -2,7 +2,7 @@
 
 This project is an AI-powered agent designed to tackle a critical challenge for researchers: identifying contradictory claims in scientific literature. It uses a robust, evidence-grounded Retrieval-Augmented Generation (RAG) pipeline to analyze and compare any two papers from PubMed.
 
-This repository is the result of a rigorous development process that went far beyond a simple tutorial. It involved iterative debugging of a complex software stack, hardening the system against inconsistent real-world data, and refactoring the core logic to meet production-grade standards.
+This repository is the result of a rigorous development process that went far beyond a simple tutorial. It involved iterative debugging of a complex software stack, hardening the system against inconsistent real-world data and refactoring the core logic to meet production-grade standards.
 
 ---
 
@@ -24,7 +24,7 @@ I designed this project to be a robust prototype, focusing on engineering decisi
 
 *   **Building for Real-World Data:** The initial PubMed data fetching was fragile. I re-engineered it to be resilient to PubMed's varied XML schemas and to gracefully handle entries with missing abstracts—a common real-world data problem.
 
-*   **A Dynamic "Just-in-Time" Database:** The application doesn't require a pre-populated database. When a user enters new PubMed IDs, the system automatically fetches the abstracts, performs semantic chunking, and ingests them into the local ChromaDB vector store on the fly.
+*   **A Dynamic "Just-in-Time" Database:** The application doesn't require a pre-populated database. When a user enters new PubMed IDs, the system automatically fetches the abstracts, performs semantic chunking and ingests them into the local ChromaDB vector store on the fly.
 
 *   **High-Fidelity Retrieval:** A simple vector search is not enough. This pipeline uses a two-stage process for accuracy:
     1.  **Semantic Chunking & Candidate Retrieval:** Abstracts are split into contextually-aware chunks and retrieved from **ChromaDB**.
@@ -397,4 +397,4 @@ To enable Torch verifier in Kubernetes, provide checkpoint artifacts inside the 
 3. ML rigor: ship baseline + trainable model + reproducible evaluation + hard quality gate.
 4. MLOps shape: Dockerized runtime, GitHub Actions CI, minikube manifests, health checks, Prometheus metrics.
 5. Engineering tradeoff: default Kubernetes verifier is heuristic unless model artifacts are mounted, to keep runtime reliable.
-6. Honest status: retrieval and baseline are strong; verifier still needs quality improvements, and the gate correctly blocks release.
+6. Honest status: retrieval and baseline are strong; verifier still needs quality improvements and the gate correctly blocks release.
