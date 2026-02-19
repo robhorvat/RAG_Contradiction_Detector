@@ -390,7 +390,7 @@ To enable Torch verifier in Kubernetes, provide checkpoint artifacts inside the 
 4. Add Prometheus + Grafana dashboard bundle and alert rules.
 5. Expand ingestion to full-text documents with explicit provenance tracing.
 
-## Interview Talk Track
+## Topics to Highlight
 
 1. Problem framing: researchers face contradictory biomedical findings and need evidence-grounded triage.
 2. Core design decision: combine RAG extraction with explicit verifier arbitration instead of prompt-only verdicts.
