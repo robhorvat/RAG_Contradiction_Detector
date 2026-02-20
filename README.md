@@ -14,7 +14,7 @@ This repository is the result of a rigorous development process that went far be
 
 ## The Problem
 
-The volume of biomedical research is staggering. For any given topic, there are often dozens of studies with conflicting findings. Manually tracking these is a massive bottleneck. This tool was built to automate the first-pass analysis, using an AI agent to flag potential contradictions and, crucially, to show the exact evidence for its reasoning.
+The volume of biomedical research is staggering. For any given topic, there are often dozens of studies with conflicting findings. Manually tracking these is a massive bottleneck. This tool was built to automate the first-pass analysis, using an AI agent to flag potential contradictions and crucially to show the exact evidence for its reasoning.
 
 ## My Approach: A Production-Minded RAG System
 
