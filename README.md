@@ -1,8 +1,15 @@
 # 🔎 Biomedical Contradiction Detector
 
-This project is an AI-powered agent designed to tackle a critical challenge for researchers: identifying contradictory claims in scientific literature. It uses a robust, evidence-grounded Retrieval-Augmented Generation (RAG) pipeline to analyze and compare any two papers from PubMed.
+I built this project to help with a practical research problem: finding contradictory claims across biomedical papers without manually reading dozens of abstracts first.
 
-This repository is the result of a rigorous development process that went far beyond a simple tutorial. It involved iterative debugging of a complex software stack, hardening the system against inconsistent real-world data and refactoring the core logic to meet production-grade standards.
+The app takes two PubMed IDs, retrieves evidence, extracts claims and returns a verdict with the exact passages used by the pipeline. The goal is not to replace a domain expert, but to speed up first-pass triage with transparent evidence.
+
+## What is in this repository
+
+- A retrieval-first contradiction checker over PubMed abstracts
+- A baseline heuristic verifier and an optional trainable PyTorch verifier
+- Reproducible evaluation scripts with explicit quality gates
+- Streamlit app, Docker runtime, Minikube manifests and Prometheus metrics
 
 ---
 
@@ -14,23 +21,23 @@ This repository is the result of a rigorous development process that went far be
 
 ## The Problem
 
-The volume of biomedical research is staggering. For any given topic, there are often dozens of studies with conflicting findings. Manually tracking these is a massive bottleneck. This tool was built to automate the first-pass analysis, using an AI agent to flag potential contradictions and crucially to show the exact evidence for its reasoning.
+Biomedical literature moves fast and findings often conflict. Tracking those contradictions by hand is slow and error-prone. This project focuses on that exact bottleneck: surface likely conflicts quickly and show the supporting text for every verdict.
 
-## My Approach: A Production-Minded RAG System
+## What I Built (and Why)
 
-I designed this project to be a robust prototype, focusing on engineering decisions that a senior developer would make.
+I treated this as an engineering project, not just a prompt demo. The design choices below are there to make behavior inspectable and reproducible.
 
-*   **Evidence-Grounded Reasoning:** The core principle is that the LLM's final verdict **must** be based on retrieved text, not its own internal knowledge. The final version of this app implements a true RAG pipeline where only the most relevant, re-ranked passages from each paper are sent to the LLM for analysis.
+*   **Evidence-Grounded Reasoning:** The LLM verdict is grounded in retrieved passages, not free-form model memory. Only relevant re-ranked chunks are sent into analysis.
 
-*   **Building for Real-World Data:** The initial PubMed data fetching was fragile. I re-engineered it to be resilient to PubMed's varied XML schemas and to gracefully handle entries with missing abstracts—a common real-world data problem.
+*   **Building for Real Data:** PubMed XML is inconsistent in practice. The ingestion layer was hardened to handle schema variation and missing abstracts.
 
-*   **A Dynamic "Just-in-Time" Database:** The application doesn't require a pre-populated database. When a user enters new PubMed IDs, the system automatically fetches the abstracts, performs semantic chunking and ingests them into the local ChromaDB vector store on the fly.
+*   **Just-in-Time Indexing:** The app does not require a preloaded corpus. On new PubMed IDs it fetches, chunks and indexes content into ChromaDB on demand.
 
-*   **High-Fidelity Retrieval:** A simple vector search is not enough. This pipeline uses a two-stage process for accuracy:
+*   **High-Fidelity Retrieval:** A single vector lookup was not enough. Retrieval is two-stage:
     1.  **Semantic Chunking & Candidate Retrieval:** Abstracts are split into contextually-aware chunks and retrieved from **ChromaDB**.
     2.  **High-Relevance Re-ranking:** **Cohere's** powerful re-ranker is used to ensure only the most relevant passages are passed to the agent, filtering out noise.
 
-*   **Trust and Transparency in the UI:** The Streamlit UI was designed to build user trust. It doesn't just show a verdict; it includes expandable sections that display the **exact evidence passages** the agent used for its analysis, making the reasoning process transparent.
+*   **Transparent UI:** The app shows claims, verdict source and evidence snippets so users can audit how a result was produced.
 
 ## Architecture
 
@@ -67,10 +74,10 @@ Latest reproducible harness run (`make eval-report`, 2026-02-17 UTC):
   - current status: `fail` (expected at this training stage)
   - this is intentional and acts as a regression barrier in strict mode
 
-## Key Learnings from Development
+## Lessons Learned While Building
 
-*   **The Importance of a Stateless Architecture:** Early versions of the Streamlit app suffered from "zombie" database connections due to a conflict between caching and file deletion. I re-architected the app to be stateless on startup, guaranteeing a clean, predictable database state for every session.
-*   **Data Curation is King:** The biggest challenge was not the code, but the data. My AI mentor repeatedly provided faulty PubMed IDs. The robustness of the final application was proven by its ability to correctly analyze this "garbage" data and return a logical "Unrelated" verdict every time. This led me to build my own `verify_papers.py` script for data curation.
+*   **Stateless startup matters:** Early builds ran into stale connections caused by cache + file deletion interactions. Resetting state on startup removed those reliability issues.
+*   **Data quality dominates:** Bad PubMed IDs were a bigger source of failure than model code. That drove the addition of `verify_papers.py` and stricter data checks.
 
 ## Technical Stack
 
@@ -81,7 +88,7 @@ Latest reproducible harness run (`make eval-report`, 2026-02-17 UTC):
 *   **Data Ingestion:** PubMed API
 *   **Frontend:** Streamlit
 
-## Running the App Locally
+## Run Locally
 
 1.  **Clone the repository:**
     ```bash
@@ -123,7 +130,7 @@ Latest reproducible harness run (`make eval-report`, 2026-02-17 UTC):
     python -m streamlit run app.py
     ```
 
-## Developer Workflow (Step-by-Step)
+## Developer Workflow
 
 This repo now includes lightweight reproducibility scaffolding for evaluation and local checks.
 
@@ -390,7 +397,7 @@ To enable Torch verifier in Kubernetes, provide checkpoint artifacts inside the 
 4. Add Prometheus + Grafana dashboard bundle and alert rules.
 5. Expand ingestion to full-text documents with explicit provenance tracing.
 
-## Topics to Highlight
+## Discussion Points
 
 1. Problem framing: researchers face contradictory biomedical findings and need evidence-grounded triage.
 2. Core design decision: combine RAG extraction with explicit verifier arbitration instead of prompt-only verdicts.
