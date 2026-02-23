@@ -7,9 +7,8 @@ def chunk_text_semantically(text: str, openai_api_key: str) -> list[str]:
     """
     Splits text into semantically coherent chunks using an embedding model.
 
-    This advanced splitting method is preferred over simple character-based chunking
-    because it preserves the contextual integrity of the text, which is crucial
-    for the accuracy of the downstream RAG pipeline.
+    Semantic splitting keeps related sentences together better than fixed-size
+    character chunking, which improves downstream retrieval quality.
 
     Args:
         text: The text content to be chunked.
@@ -20,9 +19,7 @@ def chunk_text_semantically(text: str, openai_api_key: str) -> list[str]:
     """
     embeddings = OpenAIEmbeddings(openai_api_key=openai_api_key, model="text-embedding-3-small")
 
-    # Using the "percentile" threshold is a more adaptive strategy than a fixed
-    # similarity score. It determines splits based on statistical outliers in
-    # sentence similarity, making it robust to different text styles.
+    # Use percentile thresholding to adapt split points to each document.
     text_splitter = SemanticChunker(
         embeddings=embeddings,
         breakpoint_threshold_type="percentile"
@@ -33,7 +30,7 @@ def chunk_text_semantically(text: str, openai_api_key: str) -> list[str]:
     return chunks
 
 
-# This block is for direct script testing and demonstration.
+# Local script entry point for manual checks.
 if __name__ == '__main__':
     from dotenv import load_dotenv
 

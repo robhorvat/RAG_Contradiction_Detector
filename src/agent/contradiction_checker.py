@@ -101,8 +101,7 @@ class ContradictionChecker:
                 system_prompt=self.system_prompt,
                 user_message=user_message,
             )
-            # This is the crucial validation step. It will raise a ValidationError
-            # if the JSON from the LLM is malformed or missing fields.
+            # Validate LLM output shape and required fields.
             validated_data = LLMResponse.model_validate(llm_output)
 
             # Convert the validated Pydantic model back to a dict for the rest of the app.

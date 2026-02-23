@@ -46,9 +46,8 @@ class ChromaManager:
         """
         Checks which documents from a list of IDs already exist in the collection.
 
-        This is a crucial helper for our "just-in-time" ingestion strategy.
-        It allows the app to avoid re-processing papers that are already in the database.
-        It returns a set for efficient membership checking.
+        Used by just-in-time ingestion to skip documents already indexed.
+        Returns a set for efficient membership checks.
 
         Args:
             collection: The ChromaDB collection object to check against.
@@ -60,13 +59,12 @@ class ChromaManager:
         if not doc_ids:
             return set()
 
-        # The `get` method is an efficient way to check for existence by ID.
-        # It will only return the documents that it finds.
+        # `get(ids=...)` returns only IDs present in the collection.
         existing_docs = collection.get(ids=doc_ids)
         return set(existing_docs['ids'])
 
 
-# This block is for direct script testing and demonstration.
+# Local script entry point for manual checks.
 if __name__ == '__main__':
     load_dotenv()
     api_key = os.getenv("OPENAI_API_KEY")
