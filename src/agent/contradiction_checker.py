@@ -57,8 +57,7 @@ class ContradictionChecker:
 
     def _get_system_prompt(self):
         """Creates the master prompt for the LLM, instructing it to act as a researcher and return a structured JSON response."""
-        # By providing the full JSON schema within the prompt, we drastically increase
-        # the likelihood that the LLM's output will be perfectly structured and parsable.
+        # Providing the full JSON schema in the prompt improves structured outputs.
         return """
         You are a meticulous biomedical researcher. Your task is to analyze key claims from text passages retrieved from two scientific abstracts.
 

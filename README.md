@@ -25,7 +25,7 @@ Biomedical literature moves fast and findings often conflict. Tracking those con
 
 ## What I Built (and Why)
 
-I treated this as an engineering project, not just a prompt demo. The design choices below are there to make behavior inspectable and reproducible.
+I treated this as an engineering project, not just a demo. The design choices below are there to make behavior inspectable and reproducible.
 
 *   **Evidence-Grounded Reasoning:** The LLM verdict is grounded in retrieved passages, not free-form model memory. Only relevant re-ranked chunks are sent into analysis.
 
@@ -385,7 +385,7 @@ To enable Torch verifier in Kubernetes, provide checkpoint artifacts inside the 
 ## Limitations
 
 - Current ingestion focuses on abstracts, not full-text PDFs.
-- SciFact does not perfectly match every biomedical contradiction pattern in PubMed.
+- SciFact does not fully match every biomedical contradiction pattern in PubMed.
 - Torch verifier quality is currently below production threshold and needs further training/data curation.
 - Streamlit-first app architecture is ideal for demos, but API-first service split is preferable for large-scale serving.
 
